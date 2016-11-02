@@ -7,10 +7,11 @@ include Automaton
 let any_char = (0, 255)
 
 let interval_diff (a1,b1) (a2,b2) =
-  if a1<a2 then
-    if b1<b2 then [a1, min (a2-1) b1]
+  if a1 < a2 then
+    if b1 <= b2 then [a1, min (a2-1) b1]
     else [(a1, a2-1);(b2+1, b1)]
-  else if b1<=b2 then []
+  else
+    if b1 <= b2 then []
     else [max a1 (b2+1), b1]
 
 let diff cs1 cs2 =
@@ -36,6 +37,11 @@ let norm_cs cs = List.map
   (fun (a,b) ->
     let a, b = int_of_char a, int_of_char b in
     min a b, max a b) cs
+
+let check_cs cs = List.map
+  (fun (a,b) -> if a>b then failwith "check_cs") cs
+
+
 
 let disjoint cs = match cs with [] | [_] -> cs | _ ->
   let cs = List.sort (fun (a,_) (b,_) -> compare a b) cs in
