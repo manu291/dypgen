@@ -4,7 +4,7 @@ open Lexing
 module Ordered_string =
 struct
   type t = string
-  let compare = Pervasives.compare
+  let compare = Stdlib.compare
 end
 
 module String_map = Map.Make(Ordered_string)
@@ -66,7 +66,7 @@ and extract_type_2 = parse
 and extract_pp_type = parse
   | ' ' * "val __dypgen_dummy_marker_5 : unit" newline
       { Buffer.add_string string_buf "\n";
-      let s = String.copy (Buffer.contents string_buf) in
+      let s = (*TODO String.copy*) (Buffer.contents string_buf) in
       Buffer.clear string_buf;
       let lexbuf2 = Lexing.from_string s in
       let slist = List.rev (remove_tpar [] lexbuf2) in
@@ -97,7 +97,7 @@ and fun_type_2 map curr_val = parse
     { let m =
       if curr_val <> "" then
         String_map.add curr_val
-        (String.copy (Buffer.contents string_buf)) map
+        ((*TODO String.copy*) (Buffer.contents string_buf)) map
       else map in
     Buffer.clear string_buf;
     Buffer.add_string string_buf s;
@@ -117,16 +117,16 @@ and remove_tpar slist = parse
 and replace_tpar oldtp newtp = parse
   | [^'''] * eof { Buffer.add_string string_buf (Lexing.lexeme lexbuf) }
   | ''' ['a'-'z'] ['0'-'9']* [' ''\010''\013'','')']
-    { let r = Lexing.lexeme lexbuf in
-    let len = String.length r in
-    let s = String.sub r 1 (len-2) in
+    { let r = Bytes.of_string(Lexing.lexeme lexbuf) in
+    let len = Bytes.length r in
+    let s = (Bytes.sub r 1 (len-2)) in
     if s = oldtp then
-      (let s = "'"^newtp^" " in
-      let len2 = String.length s in
-      s.[len2-1] <- r.[len-1];
-      Buffer.add_string string_buf s)
+      (let s = Bytes.of_string ("'"^newtp^" ") in
+      let len2 = Bytes.length s in
+      Bytes.set s (len2-1) (Bytes.get r (len-1));
+      Buffer.add_bytes string_buf s)
     else
-      Buffer.add_string string_buf r;
+      Buffer.add_bytes string_buf r;
     replace_tpar oldtp newtp lexbuf }
   | [^'''] + { Buffer.add_string string_buf (Lexing.lexeme lexbuf);
     replace_tpar oldtp newtp lexbuf }
@@ -137,12 +137,14 @@ and fix_variant fun_typ = parse
   | [^'_''['] * eof { () }
   | "_[" ['<''>']
     { let i = Lexing.lexeme_start lexbuf in
-    fun_typ.[i] <- ' '; fun_typ.[i+2] <- ' ';
-    fix_variant fun_typ lexbuf}
+    let fun_typ2 = Bytes.of_string fun_typ in
+    Bytes.set fun_typ2 i  ' '; Bytes.set fun_typ2 (i+2)  ' ';
+    fix_variant (Bytes.to_string fun_typ2) lexbuf}
   | "[" ['<''>']
     { let i = Lexing.lexeme_start lexbuf in
-    fun_typ.[i+1] <- ' ';
-    fix_variant fun_typ lexbuf}
+    let fun_typ2 = Bytes.of_string fun_typ in
+    Bytes.set fun_typ2 (i+1)  ' ';
+    fix_variant (Bytes.to_string fun_typ2) lexbuf}
   | [^'_''['] + { fix_variant fun_typ lexbuf }
   | ['_''['] { fix_variant fun_typ lexbuf }
 
@@ -164,7 +166,7 @@ and fst_in_conj fun_typ = parse
   | [^'&''(''['']''|'] + { fst_in_conj fun_typ lexbuf }
   | '&' { let start_pos = Lexing.lexeme_start lexbuf in
     let end_pos = end_of_conj lexbuf in
-    String.fill fun_typ start_pos (end_pos-start_pos) ' ' }
+    Bytes.fill fun_typ start_pos (end_pos-start_pos) ' ' }
   | ['(''['] { remove_conj_2 fun_typ lexbuf;
     fst_in_conj fun_typ lexbuf }
   | ['|'']'] { () }
